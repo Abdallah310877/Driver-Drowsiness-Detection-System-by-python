@@ -115,5 +115,5 @@ while True:
     cv2.imshow("Frame", frame)
     #cv2.imshow("Result of detector", face_frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
-        #ser.close()
+
         break
