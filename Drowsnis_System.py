@@ -1,3 +1,6 @@
+import urllib.request
+url="http://192.168.1.74"
+AWB = True
 #Importing OpenCV Library for basic image processing functions
 import cv2
 #Numpy for array related functions
@@ -7,6 +10,11 @@ import dlib
 #face_utils for basic operations of conversion
 from imutils import face_utils
 from pygame import mixer
+#Get path of laravel
+import subprocess
+#Get serial of GPS-module
+import serial
+
 
 mixer.init()
 sound = mixer.Sound('mixkit-classic-alarm-995.wav')
@@ -16,7 +24,7 @@ detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("shape_predictor_68_face_Landmarks.dat")
 
 #Initializing the camera and taking the instance
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(url + ":81/stream")
 
 #status marking for current state
 sleep = 0
@@ -25,6 +33,8 @@ active = 0
 state= ""
 color=(0,0,0)
 
+# Open a serial connection to the ESP32
+ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
 
 def compute(ptA,ptB):
     dist = np.linalg.norm(ptA - ptB)
@@ -51,7 +61,7 @@ while True:
     faces = detector(gray)
     #detected face in faces array
     for face in faces:
-        #print(face)
+        
         x1 = face.left()
         y1 = face.top()
         x2 = face.right()
@@ -79,10 +89,14 @@ while True:
                 color=(0,0,255)
                 try:
                     sound.play()
-                   
+                    # Send a message to the ESP32 to trigger the GPS module
+                    ser.write(b'1')
+
                 except:
                     
                     pass
+                # Send alert to Laravel database
+                subprocess.call(["php", "/path/to/alert_script.php", "drowsy", "Driver is sleeping"])
         
         elif(left_blink==1 or right_blink==1):
             sleep=0
@@ -91,6 +105,8 @@ while True:
             if(drowsy>6):
                 state="Drowsy !"
                 color = (255,0,0)
+                # Send alert to Laravel database
+                subprocess.call(["php", "/path/to/alert_script.php", "drowsy", "Driver is drowsy"])
         
         else:
             drowsy=0
@@ -101,10 +117,14 @@ while True:
                 color = (0,255,0)
                 try:
                     sound.stop()
+                    # Send a message to the ESP32 to stop the GPS module
+                    ser.write(b'STOP\n')
 
                 except:
 
                     pass
+                # Send alert to Laravel database
+                subprocess.call(["php", "/path/to/alert_script.php", "active", "Driver is active"])
                 
         cv2.putText(frame, state, (100,100), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color,3)
 
@@ -113,7 +133,7 @@ while True:
             cv2.circle(frame, (x,y), 1, (255, 255, 255), -1)
 
     cv2.imshow("Frame", frame)
-    #cv2.imshow("Result of detector", face_frame)
+    
     if cv2.waitKey(1) & 0xFF == ord('q'):
-
+        ser.close()
         break
